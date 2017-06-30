@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">KtPopup</string>
+    <string name="mediaTypeNotImplemented">Media Type not implemented</string>
+</resources>
