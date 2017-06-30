@@ -4,17 +4,20 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.support.v4.view.PagerAdapter
-import android.util.AttributeSet
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.widget.TextView
+import com.arcgis.apps.ktpopup.Models.ImageData
+import com.arcgis.apps.ktpopup.Models.MediaChartData
+import com.arcgis.apps.ktpopup.Models.PageData
+import com.arcgis.apps.ktpopup.Models.PopupData
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
+import com.esri.arcgisruntime.mapping.popup.Popup
 
 import com.esri.arcgisruntime.mapping.popup.PopupMedia
 import com.github.mikephil.charting.charts.*
@@ -34,7 +37,8 @@ class MediaPager(val context: Context, var pageDatas: ArrayList<PageData>) : Pag
         linearLayout.orientation = LinearLayout.VERTICAL
 
         var data = pageData.data
-        // Equivalent to Java Switch Statement
+
+        //Kotlin-ism Equivalent to Java Switch Statement
         when (pageData.type) {
 
             PopupMedia.Type.IMAGE -> {
@@ -61,12 +65,18 @@ class MediaPager(val context: Context, var pageDatas: ArrayList<PageData>) : Pag
                 linearLayout.addView(imageView)
             }
 
-            PopupMedia.Type.BAR_CHART -> {
+            PopupMedia.Type.BAR_CHART, PopupMedia.Type.COLUMN_CHART -> {
                 if (data is MediaChartData) {
 
                     chartStart(pageData, linearLayout, data)
 
-                    var barChart = HorizontalBarChart(context)
+                    //These are the same chart under the hood.
+                    var barChart: BarChart
+                    if (pageData.type == PopupMedia.Type.COLUMN_CHART) {
+                        barChart = BarChart(context)
+                    } else {
+                        barChart = HorizontalBarChart(context)
+                    }
 
                     linearLayout.addView(barChart)
 
@@ -77,40 +87,6 @@ class MediaPager(val context: Context, var pageDatas: ArrayList<PageData>) : Pag
                     val barData = BarData(barDataSet)
                     barData.barWidth = .9f
 
-
-                    barChart.description.isEnabled = false
-                    barChart.legend.isEnabled = false
-                    barChart.data = barData
-                    barChart.setFitBars(true)
-                    barChart.setPinchZoom(false)
-                    barChart.isDoubleTapToZoomEnabled = false
-                    barChart.xAxis.valueFormatter = IAxisValueFormatter { value, _ -> return@IAxisValueFormatter data.fieldNames[value.toInt()] }
-                    barChart.xAxis.granularity = 1f
-                    barChart.invalidate()
-
-                    barChart.layoutParams.width = LinearLayout.LayoutParams.MATCH_PARENT
-                    barChart.layoutParams.height = 500
-                    barChart.invalidate()
-
-                }
-
-            }
-
-            PopupMedia.Type.COLUMN_CHART -> {
-                if (data is MediaChartData) {
-
-                    chartStart(pageData, linearLayout, data)
-
-                    var barChart = BarChart(context)
-
-                    linearLayout.addView(barChart)
-
-                    val list: ArrayList<BarEntry> = arrayListOf()
-                    data.chartData.mapTo(list) { BarEntry(it.x, it.y) }
-                    val barDataSet = BarDataSet(list, "DataSet")
-                    barDataSet.colors = ColorTemplate.MATERIAL_COLORS.asList()
-                    val barData = BarData(barDataSet)
-                    barData.barWidth = .9f
 
                     barChart.description.isEnabled = false
                     barChart.legend.isEnabled = false
@@ -140,13 +116,13 @@ class MediaPager(val context: Context, var pageDatas: ArrayList<PageData>) : Pag
                     linearLayout.addView(lineChart)
 
 
-                    val barDataSet = LineDataSet(data.chartData, "DataSet")
-                    barDataSet.colors = ColorTemplate.MATERIAL_COLORS.asList()
-                    val barData = LineData(barDataSet)
+                    val lineDataSet = LineDataSet(data.chartData, "DataSet")
+                    lineDataSet.colors = ColorTemplate.MATERIAL_COLORS.asList()
+                    val lineData = LineData(lineDataSet)
 
                     lineChart.description.isEnabled = false
                     lineChart.legend.isEnabled = false
-                    lineChart.data = barData
+                    lineChart.data = lineData
                     lineChart.setPinchZoom(false)
                     lineChart.isDoubleTapToZoomEnabled = false
                     lineChart.xAxis.valueFormatter = IAxisValueFormatter { value, _ -> return@IAxisValueFormatter data.fieldNames[value.toInt()] }
@@ -172,13 +148,13 @@ class MediaPager(val context: Context, var pageDatas: ArrayList<PageData>) : Pag
                     val list: ArrayList<PieEntry> = arrayListOf()
                     data.chartData.mapTo(list) { PieEntry(it.y) }
 
-                    val barDataSet = PieDataSet(list, "DataSet")
-                    barDataSet.colors = ColorTemplate.MATERIAL_COLORS.asList()
-                    val barData = PieData(barDataSet)
+                    val pieDataSet = PieDataSet(list, "DataSet")
+                    pieDataSet.colors = ColorTemplate.MATERIAL_COLORS.asList()
+                    val pieData = PieData(pieDataSet)
 
                     pieChart.description.isEnabled = false
                     pieChart.legend.isEnabled = false
-                    pieChart.data = barData
+                    pieChart.data = pieData
 
                     pieChart.invalidate()
 
@@ -190,8 +166,8 @@ class MediaPager(val context: Context, var pageDatas: ArrayList<PageData>) : Pag
             }
 
             else -> {
-                if (data is String) {
-                    val webViewContent = data
+                if (data is PopupData) {
+                    val webViewContent = data.definition
                     val webView = WebView(context)
                     webView.loadData(webViewContent, "text/html; charset=UTF-8", null)
                     linearLayout.addView(webView)
