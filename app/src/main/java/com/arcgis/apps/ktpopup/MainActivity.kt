@@ -26,41 +26,26 @@ import kotlinx.android.synthetic.main.popup_template.view.*
 
 class MainActivity : AppCompatActivity() {
 
-    var mediaPager : MediaPager? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        mediaPager = MediaPager(applicationContext, arrayListOf<PageData>())
-
         sliding_layout.anchorPoint = .45f
 
-        val webMap = getWebMap()
-        displayMapView.map = webMap
+        val mediaPager = MediaPager(applicationContext, arrayListOf<PageData>())
+        displayMapView.map = getWebMap()
 
         val popup_template = layoutInflater.inflate(R.layout.popup_template, popup_container, true)
 
-        setUpViewPager(popup_media)
-
-        displayMapView.onTouchListener = PopupTouchListener(popup_template as ViewGroup) //Kotlin-ism for casting
-
-
-    }
-
-    fun setUpViewPager(viewPager: ViewPager) {
-        viewPager.adapter = mediaPager
+        popup_media.adapter = mediaPager
+        displayMapView.onTouchListener = PopupTouchListener(popup_template as ViewGroup, mediaPager) //Kotlin-ism for casting
     }
 
     override fun onBackPressed() {
-        if (sliding_layout.panelState != SlidingUpPanelLayout.PanelState.HIDDEN ||
-                sliding_layout.panelState != SlidingUpPanelLayout.PanelState.COLLAPSED) {
+        if (sliding_layout.panelState != SlidingUpPanelLayout.PanelState.COLLAPSED) {
             sliding_layout.panelState = SlidingUpPanelLayout.PanelState.COLLAPSED
-        } else if (sliding_layout.panelState == SlidingUpPanelLayout.PanelState.HIDDEN) {
-            super.onBackPressed()
         }
         else if (sliding_layout.panelState == SlidingUpPanelLayout.PanelState.COLLAPSED) {
-            sliding_layout.panelState = SlidingUpPanelLayout.PanelState.HIDDEN
+            super.onBackPressed()
         }
 
     }
@@ -75,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         return ArcGISMap(portalItem)
     }
 
-    inner class PopupTouchListener(popupLayout: ViewGroup) : DefaultMapViewOnTouchListener(applicationContext, displayMapView) {
+    inner class PopupTouchListener(popupLayout: ViewGroup, val mediaPager: MediaPager) : DefaultMapViewOnTouchListener(applicationContext, displayMapView) {
 
         val viewGroup = popupLayout
 
@@ -113,8 +98,8 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    mediaPager?.pageDatas = pageData
-                    mediaPager?.notifyDataSetChanged()
+                    mediaPager.pageDatas = pageData
+                    mediaPager.notifyDataSetChanged()
 
                 } else {
                     //TODO: Modify this in the event that the user clicks on multiple features at once
@@ -125,30 +110,35 @@ class MainActivity : AppCompatActivity() {
 
         private fun mediaPageGenerator(it: PopupMedia, popupManager: PopupManager): BasePageData? {
             var data: BasePageData? = null
-            if (it.type == PopupMedia.Type.IMAGE) {
-                Log.e("NOHE", it.value.sourceUrl)
-                data = ImageData(fieldToData(it.value.sourceUrl, popupManager), fieldToData(it.value.linkUrl, popupManager), it.caption)
-            }
-            if (it.type == PopupMedia.Type.BAR_CHART
-                    || it.type == PopupMedia.Type.LINE_CHART
-                    || it.type == PopupMedia.Type.PIE_CHART
-                    || it.type == PopupMedia.Type.COLUMN_CHART) {
-                val entries: MutableList<Entry> = arrayListOf()
-                val fieldNames: MutableList<String> = arrayListOf()
 
-                //Kotlin-ism  This creates a for loop and an incrementer while it iterates over it
-                for ((count, field: String) in it.value.fieldNames.withIndex()) {
-                    Log.e("NOHE", field)
-                    var fieldValue = fieldToData(field, popupManager)
-                    if (!it.value.normalizeFieldName.isNullOrEmpty()) {
-                        val normalizer = fieldToData(it.value.normalizeFieldName, popupManager)
-                        fieldValue = (fieldValue.toFloat() / normalizer.toFloat()).toString()
-                    }
-                    entries.add(Entry(count.toFloat(),fieldValue.toFloat()))
-                    fieldNames.add(field)
+            when(it.type) {
+                PopupMedia.Type.IMAGE -> {
+                    Log.e("NOHE", it.value.sourceUrl)
+                    data = ImageData(fieldToData(it.value.sourceUrl, popupManager), fieldToData(it.value.linkUrl, popupManager), it.caption)
                 }
-                data = MediaChartData(entries, fieldNames, it.caption)
+
+                PopupMedia.Type.BAR_CHART,
+                PopupMedia.Type.LINE_CHART,
+                PopupMedia.Type.COLUMN_CHART,
+                PopupMedia.Type.PIE_CHART -> {
+                    val entries: MutableList<Entry> = arrayListOf()
+                    val fieldNames: MutableList<String> = arrayListOf()
+
+                    //Kotlin-ism  This creates a for loop and an incrementer while it iterates over it
+                    for ((count, field: String) in it.value.fieldNames.withIndex()) {
+                        Log.e("NOHE", field)
+                        var fieldValue = fieldToData(field, popupManager)
+                        if (!it.value.normalizeFieldName.isNullOrEmpty()) {
+                            val normalizer = fieldToData(it.value.normalizeFieldName, popupManager)
+                            fieldValue = (fieldValue.toFloat() / normalizer.toFloat()).toString()
+                        }
+                        entries.add(Entry(count.toFloat(),fieldValue.toFloat()))
+                        fieldNames.add(field)
+                    }
+                    data = MediaChartData(entries, fieldNames, it.caption)
+                }
             }
+
             return data
         }
 
